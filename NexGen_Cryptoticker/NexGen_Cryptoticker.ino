@@ -47,7 +47,7 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "LittleFS.h"
-#include <AsyncElegantOTA.h>
+#include <ElegantOTA.h>
 
 
 // ===================================== //
@@ -335,7 +335,7 @@ void setup() {
   server.serveStatic("/", LittleFS, "/");
 
   // Start ElegantOTA
-  AsyncElegantOTA.begin(&server);
+  ElegantOTA.begin(&server);
 
   // Start server
   server.begin();
