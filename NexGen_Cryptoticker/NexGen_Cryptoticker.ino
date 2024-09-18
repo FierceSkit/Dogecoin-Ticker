@@ -72,7 +72,7 @@ const long fetchInterval = 30000; // Time between API Fetch :: 30 seconds
 
 // API SHA1 HASH
 // SHA1 fingerprint of the certificate for API Endpoint Host (host)
-const char fingerprint[] PROGMEM = "ED 60 FF 86 46 D7 B1 3D 4D 73 9B 3F 32 9A EE F8 86 77 C3 F6";
+const char fingerprint[] PROGMEM = "93 BF 06 D9 08 7D 83 82 CF 80 00 9F 14 68 A4 EB 17 E5 68 F3";
 
 // Port used to connect to API Endpoint Host.
 // Since we're using SSL, we'll use port 443.
