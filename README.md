@@ -1,6 +1,8 @@
 
-# NexGen-Crypto-Ticker
-A smart 3D Printed ESP8266 Cryptocurrency Ticker
+# Dogecoin Ticker
+A smart 3D Printed ESP8266 Cryptocurrency Ticker - adapted towards Dogecoin;
+Forked from http://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker
+
 
 <img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/ToTheMoon-With-ShibeLid.jpg?raw=true" width="510"/>
 <!-- <img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/Interior-OriginalEnclosure.jpg?raw=true" width="256" /> -->
