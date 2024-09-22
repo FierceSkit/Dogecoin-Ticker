@@ -1,6 +1,9 @@
 
 # Dogecoin Ticker
-A smart 3D Printed ESP8266 Cryptocurrency Ticker adapted towards Dogecoin, forked from:
+A smart 3D Printed ESP8266 Cryptocurrency Ticker adapted towards Dogecoin.
+
+Forked from:
+
 http://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker
 
 
