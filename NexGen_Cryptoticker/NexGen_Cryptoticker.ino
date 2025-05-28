@@ -47,8 +47,11 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "LittleFS.h"
-#include <AsyncElegantOTA.h>
+#include <ArduinoOTA.h>
 
+// Local Includes
+#include "bitmaps.h"
+#include "currency_symbols.h"
 
 // ===================================== //
 // ===== Definitions and Variables ===== //
@@ -58,21 +61,16 @@ String codeVersion = "1.0.0";
 
 // Network Credentials
 #define ssid "YOUR_SSID"  // Your WiFi Network Name (Case Sensitive)
-#define password "YOUR_PASSWD"  // Your WiFi Network Password (Case Sensitive)
+#define password "YOUR_PWD"  // Your WiFi Network Password (Case Sensitive)
 
 // API Variables
 String currentCrypto = "DOGE"; // Stores default/currently selected cryptocoin
 String currentCurrency = "USD"; // Stores default/currently selected currency
 
-const long fetchInterval = 50000; // Time between API Fetch :: 30 seconds
+const long fetchInterval = 30000; // Time between API Fetch :: 30 seconds
 
 // API Definitions
 #define API_HOST ("api.gemini.com") // API Endpoint Host
-#define API_URL ("/v1/pricefeed/" + coin + target) // API Endpoint Target
-
-// API SHA1 HASH
-// SHA1 fingerprint of the certificate for API Endpoint Host (host)
-const char fingerprint[] PROGMEM = "93 BF 06 D9 08 7D 83 82 CF 80 00 9F 14 68 A4 EB 17 E5 68 F3";
 
 // Port used to connect to API Endpoint Host.
 // Since we're using SSL, we'll use port 443.
@@ -87,44 +85,6 @@ Adafruit_SSD1306 display(128, 32, &Wire, OLED_RESET);
 #define posLed 14    // Green LED
 #define negLed 12    // Red LED
 #define infoLed 13   // Blue LED
-
-// WOW_much_amaze bmp
-// 'boot', 128x32px
-const unsigned char much_amaze [] PROGMEM = {
-  0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe3, 0xff, 0xff,
-  0xff, 0x0f, 0xfe, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe1, 0xff, 0x8f,
-  0xff, 0x07, 0xfc, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe9, 0xff, 0x0f,
-  0xff, 0x27, 0xf8, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xec, 0xfe, 0x2f,
-  0xff, 0x23, 0xf1, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xec, 0xfc, 0x6f,
-  0xff, 0x30, 0x23, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xee, 0x00, 0xef,
-  0xff, 0x38, 0x07, 0x3c, 0xc6, 0x43, 0x31, 0x9f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xcf, 0xc1, 0xef,
-  0xfc, 0x3f, 0xff, 0x3c, 0xc6, 0x03, 0x31, 0x9f, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f, 0xff, 0xcf,
-  0xf8, 0xff, 0xff, 0x3c, 0x84, 0x01, 0x21, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xfc, 0x3f, 0xff, 0xcf,
-  0xe1, 0xff, 0xff, 0x3c, 0x80, 0x11, 0x20, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xfc, 0xff, 0xff, 0xcf,
-  0xe7, 0xff, 0xff, 0x3c, 0x00, 0x11, 0x00, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xf9, 0xff, 0xff, 0xe7,
-  0xcc, 0xff, 0xff, 0x9c, 0x31, 0x01, 0x0c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xf9, 0x1f, 0xff, 0xe3,
-  0xc8, 0x7c, 0xff, 0x9e, 0x31, 0x83, 0x8c, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xf3, 0x1f, 0x1f, 0xf3,
-  0x98, 0xf8, 0x3f, 0xce, 0x7b, 0xc7, 0x9e, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf3, 0x1e, 0x0f, 0xf3,
-  0x9c, 0xf8, 0x3f, 0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe7, 0xfe, 0x0f, 0xf9,
-  0x9f, 0xf8, 0x7f, 0xcf, 0xff, 0xff, 0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xe7, 0xfe, 0x1f, 0xf9,
-  0xb0, 0x7f, 0xff, 0xef, 0xff, 0xff, 0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xe4, 0x1f, 0xff, 0xf9,
-  0xb0, 0x7f, 0xff, 0xef, 0xff, 0xff, 0xff, 0xef, 0xff, 0xff, 0xff, 0xff, 0xe4, 0x0f, 0xff, 0xf9,
-  0xb0, 0x7f, 0xff, 0xef, 0xfe, 0x02, 0xdc, 0x61, 0xfc, 0x40, 0x62, 0x0c, 0x64, 0x0f, 0xff, 0xf9,
-  0xb0, 0x7f, 0xff, 0xef, 0xfe, 0x5a, 0xd9, 0xe5, 0xf9, 0x4b, 0x4b, 0xdb, 0x26, 0x1f, 0xff, 0xf9,
-  0xb9, 0xff, 0xff, 0xef, 0xfe, 0xda, 0xdb, 0xed, 0xfb, 0x5b, 0x5b, 0xb8, 0xe7, 0xff, 0xff, 0xf9,
-  0x91, 0xff, 0xff, 0xcf, 0xfe, 0xda, 0xdb, 0x6d, 0xfb, 0x5b, 0x5b, 0x7b, 0xa4, 0x1f, 0xff, 0xf9,
-  0x90, 0x03, 0xff, 0xcf, 0xfe, 0xdb, 0x1c, 0xed, 0xfc, 0x5b, 0x62, 0x0c, 0x70, 0x00, 0xff, 0xf3,
-  0x90, 0x03, 0xff, 0xcf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf3, 0x00, 0xff, 0xf3,
-  0xcf, 0xff, 0xff, 0x9f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf1, 0xff, 0xff, 0xe3,
-  0xc7, 0xff, 0xff, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf9, 0xff, 0xff, 0xe7,
-  0xe3, 0xff, 0xff, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfc, 0xff, 0xff, 0xcf,
-  0xf1, 0xff, 0xfc, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x7f, 0xff, 0x1f,
-  0xf8, 0xff, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1f, 0xfe, 0x3f,
-  0xfc, 0x3f, 0xe1, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x87, 0xf8, 0x7f,
-  0xff, 0x06, 0x03, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe0, 0x01, 0xff,
-  0xff, 0xc0, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfc, 0x0f, 0xff
-};
-
 
 // These variables are used to store LED status
 // False: Off / True: On
@@ -158,8 +118,12 @@ void initializeDisplay() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
 
   display.clearDisplay();  // Clear the display buffer
+  
+  // Show appropriate coin splash screen
+  showCoinSplash(display, currentCrypto);
 
-  // Display Text
+  // Display initialization text
+  display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(1, 0);
@@ -167,7 +131,6 @@ void initializeDisplay() {
   display.setCursor(1, 10);
   display.print("Version: " + codeVersion);
   display.display();
-
 }
 
 // Initialize LittleFS
@@ -239,57 +202,8 @@ void initWiFi() {
   display.display();
 
   delay(5000);
- // Set time via NTP, as required for x.509 validation
-  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");{
-
-  Serial.print("Waiting for NTP time sync: ");
-
-  clearDisplay();
-  display.setCursor(1, 0);
-  display.print("Syncing Time");
-  updateDisplay();
-
-  time_t now = time(nullptr);
-  while (now < 8 * 3600 * 2) {
-    delay(500);
-    Serial.print(".");
-    display.print(".");
-    updateDisplay();
-    now = time(nullptr);
-
-    updateDisplay();
-  }
-
-  struct tm timeinfo;
-  gmtime_r(&now, &timeinfo);
-
-  Serial.print("Current time: ");
-  Serial.print(asctime(&timeinfo));
-
-  // Show time on display
-  clearDisplay();
-  display.setCursor(1, 0);
-  display.print("Current Time");
-  display.setCursor(1, 10);
-  display.println(asctime(&timeinfo));
-  updateDisplay();
-
-  delay(5000);
-}
-
-
-  // Draw the boot doge
-  // drawBitmap(x position, y position, bitmap data, bitmap width, bitmap height, color)
-  clearDisplay();
-  display.setCursor(1, 0);
-  display.drawBitmap(0, 0, much_amaze, 128, 32, WHITE);
-  updateDisplay();
-
-  delay(2000);
-  clearDisplay();
 
 }
-
 
 String getCurrentStates() {
 
@@ -403,6 +317,48 @@ char* string2char(String ipString) { // make it to return pointer not a single c
   return opChar; //Add this return statement.
 }
 
+void initOTA() {
+  // Port defaults to 8266
+  // ArduinoOTA.setPort(8266);
+
+  // Hostname defaults to esp8266-[ChipID]
+  ArduinoOTA.setHostname("DogeTickler");
+
+  // No authentication by default
+  // ArduinoOTA.setPassword("admin");
+
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_FS
+      type = "filesystem";
+    }
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    Serial.println("Start updating " + type);
+  });
+  
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+
+  ArduinoOTA.begin();
+  Serial.println("OTA Ready");
+}
+
 void setup() {
   // Serial port for debugging purposes
   Serial.begin(115200);
@@ -413,6 +369,7 @@ void setup() {
   initLittleFS();
   initWiFi();
   initWebSocket();
+  initOTA();  // Initialize OTA
 
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -421,135 +378,141 @@ void setup() {
 
   server.serveStatic("/", LittleFS, "/");
 
-  // Start ElegantOTA
-  ElegantOTA.begin(&server);
-
   // Start server
   server.begin();
 }
 
 void loop() {
-
   unsigned long currentFetch = millis();
 
   if (currentFetch - previousFetch >= fetchInterval) {
-
     previousFetch = currentFetch; // Store the time
-
     fetchApi(currentCrypto, currentCurrency);
   }
 
+  ArduinoOTA.handle();  // Handle OTA updates
   ws.cleanupClients();
-
 }
 
 // Fetch data from the API
 void fetchApi(String coin, String target) {
+  // Show appropriate coin splash while waiting for first successful API response
+  static bool firstFetch = true;
+  if (firstFetch) {
+    showCoinSplash(display, coin);
+    firstFetch = false;
+  }
+  
   Serial.println("Fetching '" + coin + "/" + target + "' data from API.");
 
-  WiFiClientSecure client;              // Connect to our API URL
-  client.setFingerprint(fingerprint);   // Set the Fingerprint for SSL
+  WiFiClientSecure client;
+  client.setInsecure();  // Don't verify SSL certificate
+
+  Serial.print("Connecting to ");
+  Serial.println(API_HOST);
 
   // If we can't connect...
   if (!client.connect(API_HOST, httpsPort)) {
-    Serial.println("Can't connect to: ");
-    Serial.print(API_HOST);
-
-    String apiError = "Can't connect to API!";
-
-    // Show error on display
+    Serial.println("Connection failed!");
+    String apiError = "Connection failed!";
     displayError("API Error", apiError);
-
     return;
   }
 
-  // Otherwise, set headers
-  String request = ("GET " +  API_URL + " HTTP/1.1\r\n" +
-                    "Host: " + API_HOST + "\r\n" +
-                    "User-Agent: ESP8266\r\n" +
-                    "Accept: */*\r\n" +
-                    "Connection: close\r\n\r\n");
+  Serial.println("Connected to API endpoint");
 
+  // Construct the URL properly
+  String apiUrl = "/v1/pricefeed/" + coin + target;
+
+  // Set headers
+  String request = String("GET ") + apiUrl + " HTTP/1.1\r\n" +
+                  "Host: " + API_HOST + "\r\n" +
+                  "User-Agent: ESP8266\r\n" +
+                  "Connection: close\r\n\r\n";
+
+  Serial.println("Sending request...");
   client.print(request);
 
-  // While we are connected, read the data
-  while (client.connected()) {
-
-    String line = client.readStringUntil('\n');
-    /*if (line == "\r") {
-      //Serial.println("==========\nHeaders Received\n==========\n");
-      break;
-    }*/
+  Serial.println("Reading response...");
+  
+  // Wait for data to be available
+  unsigned long timeout = millis();
+  while (client.available() == 0) {
+    if (millis() - timeout > 5000) {
+      Serial.println(">>> Client Timeout !");
+      client.stop();
+      displayError("API Error", "Timeout");
+      return;
+    }
   }
 
-  // Load our JSON into data variable
-  String data = client.readStringUntil('\n');
+  // Skip HTTP headers
+  String line;
+  bool jsonStarted = false;
+  String jsonData = "";
+  
+  while (client.available()) {
+    line = client.readStringUntil('\n');
+    line.trim(); // Remove leading/trailing whitespace
+    
+    // Debug print the line
+    Serial.println("Read line: " + line);
+    
+    // Check if we've found the end of headers
+    if (line.length() == 0) {
+      jsonStarted = true;
+      continue;
+    }
+    
+    // If we're past headers, this should be JSON data
+    if (jsonStarted && line.length() > 0) {
+      jsonData = line;
+      break;
+    }
+  }
+
+  Serial.println("Raw API Response: " + jsonData);
 
   // Set JSON Size in Buffer
-  StaticJsonDocument<64> filter;
-
-  // Setup JSON Filter
-  JsonObject filter_0 = filter.createNestedObject();
-  filter_0["base"] = true;
-  filter_0["target"] = true;
-  filter_0["pair"] = true;
-  filter_0["price"] = true;
-  filter_0["percentChange24h"] = true;
-
-  // Build JSON Doc
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<192> doc;
 
   // Handle any deserialization errors
-  DeserializationError error = deserializeJson(doc, data, DeserializationOption::Filter(filter));
+  DeserializationError error = deserializeJson(doc, jsonData);
 
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.f_str());
+    displayError("JSON Error", error.f_str());
     return;
   }
 
-  // Set our received data variables
+  // Get the first array element
   JsonObject root_0 = doc[0];
-  const char* data_pair = root_0["pair"]; // "DOGEUSD"
-  const char* data_price = root_0["price"]; // "0"
-  auto data_change = root_0["percentChange24h"].as<float>(); // "0.0000"
+  
+  if (!root_0.isNull()) {
+    String price = root_0["price"].as<String>();
+    float change = root_0["percentChange24h"].as<float>();
 
-  // Convert data_change to percent
-  float changePercent = (data_change * 100);
+    // Debug prints
+    Serial.println("Parsed price: " + price);
+    Serial.println("Parsed change: " + String(change, 4));
 
-  if (data != "" /*&& data_change != 0*/ ) {
-
-    // Serial Monitor
-    Serial.println("\n== == == == == == ==");
-    Serial.print("Pair: ");
-    Serial.println(data_pair);
-    Serial.print("Price: ");
-    Serial.println(data_price);
-    Serial.print("1-Hour Change: ");
-    Serial.println(String(changePercent) + "%");
-    Serial.println(data);
-
-    // Update the display
-    updatePrice(coin, target, data_price, changePercent);
-
+    if (price != "") {
+      // Update the display
+      updatePrice(coin, target, price, change);
+    } else {
+      displayError("API ERROR", "Invalid price data");
+    }
   } else {
-
-    // Serial Monitor
-    Serial.println(" ========== ");
-    Serial.print("API Error: ");
-
-    String apiError ("JSON Invalid");
-
-    // Show error on display
-    displayError("API ERROR", apiError);
-
+    displayError("API ERROR", "Invalid JSON format");
   }
+
+  // Close the connection
+  client.stop();
 }
 
 // Update the price and price change on the display
 void updatePrice(String base, String target, String price, float change) {
-
-
   // Clear Display Buffer
   clearDisplay();
 
@@ -565,19 +528,53 @@ void updatePrice(String base, String target, String price, float change) {
   display.setCursor(1, 16);
   display.setTextColor(WHITE); // Revert to dark BG, White text
   display.setFont(&FreeSansBold9pt7b);
-  display.print("$ ");
-  display.print(price.substring(0, 11));
+  
+  // Choose currency symbol based on target currency
+  const char* currencySymbol;
+  if (target == "USD") {
+    currencySymbol = SYMBOL_USD;
+  } else if (target == "EUR") {
+    currencySymbol = SYMBOL_EUR;
+  } else if (target == "AUD") {
+    currencySymbol = SYMBOL_AUD;
+  } else if (target == "JPY") {
+    currencySymbol = SYMBOL_JPY;
+  } else if (target == "GBP") {
+    currencySymbol = SYMBOL_GBP;
+  } else if (target == "RUB") {
+    currencySymbol = SYMBOL_RUB;
+  } else if (target == "SGD") {
+    currencySymbol = SYMBOL_SGD;
+  } else if (target == "CAD") {
+    currencySymbol = SYMBOL_CAD;
+  } else {
+    currencySymbol = SYMBOL_USD; // Default to USD if unknown
+  }
+  
+  display.print(currencySymbol);
+  display.print(" ");
+  
+  // For JPY, show without decimal places as it's a whole number currency
+  if (target == "JPY") {
+    // Convert price to integer and remove decimal places
+    display.print(String((int)price.toFloat()));
+  } else {
+    display.print(price.substring(0, 11));
+  }
   display.setFont();
 
-  // Set the 1-hour change
+  // Set the 24-hour change
   display.setCursor(1, 25);
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  display.print("Change: " + String(change));
+  // Convert change to percentage
+  float changePercent = change * 100.0;
+  display.print("Change: ");
+  display.print(changePercent, 2); // Display with 2 decimal places
   display.println(" %");
 
   // Update LED's
-  updateLed(change);
+  updateLed(changePercent);
 
   // Update the display
   updateDisplay();
