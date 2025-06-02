@@ -22,648 +22,204 @@
   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
   THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  
 */
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <WiFiClientSecure.h>
-
-// Include Display Definitions/Variables
-
-#include <display.h>
-
-// Fonts
-#include <Fonts/FreeSansBold9pt7b.h>
-#include <Fonts/FreeSansBold12pt7b.h>
-
-// Images
-#include <images.h>
-
-// JSON Includes
-#include <Arduino_JSON.h>
-#include <ArduinoJson.h>
-
-// OTA & WebServer Includes
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include "LittleFS.h"
-#include <ElegantOTA.h>
 
-// Include Definitions & Variables for WiFi & API // SSL
-#include <definitions.h>
+#include "display_handler.h"
+#include "api_handler.h"
+#include "led_handler.h"
+#include "button_handler.h"
+#include "websocket_handler.h"
+#include "wifi_handler.h"
 
-// Include Setup for LED's
+// Network Credentials
+#define ssid "YOUR_SSID"
+#define password "YOUR_PASSWD"
 
-// LED Definitions
-#define ONBOARDLED 2 // Built in LED on ESP-12/ESP-07
-#define posLed 14    // Green LED
-#define negLed 12    // Red LED
-#define infoLed 13   // Blue LED
+// Pin Definitions
+#define ONBOARDLED 2
+#define posLed 14
+#define negLed 12
+#define infoLed 13
+#define OLED_RESET -1
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 32
+#define OLED_ADDR 0x3C
 
-// These variables are used to store LED status
-// False: Off / True: On
-bool onboardLedStatus;
-bool posLedStatus;
-bool negLedStatus;
-bool infoLedStatus;
+// Available cryptocurrencies
+const int NUM_CRYPTOCURRENCIES = 3;
+const String CRYPTOCURRENCIES[NUM_CRYPTOCURRENCIES] = {"BTC", "DOGE", "LTC"};
+int currentCryptoIndex = 0;
 
-// Websocket Variables
-const char* sender; // Variable to store who is sending websocket messages
+// Available fiat currencies
+const int NUM_FIAT_CURRENCIES = 5;
+const String FIAT_CURRENCIES[NUM_FIAT_CURRENCIES] = {"USD", "EUR", "GBP", "RUB", "SGD"};
+int currentFiatIndex = 0;
 
-// Miscellaneous
-#define ARDUINOJSON_ENABLE_ARDUINO_STRING 1
-String values;
-#define NUM_STATES  1
-String stateVars[NUM_STATES] = {values}; //
-unsigned long previousFetch = 0; // Stores the last time API was fetched
+// Global variables
+String currentCrypto = "BTC";
+String currentCurrency = "USD";
+unsigned long previousFetch = 0;
+const long fetchInterval = 30000;
+bool isPreviewMode = false;
+unsigned long previewStartTime = 0;
+const unsigned long PREVIEW_DURATION = 2000;
+
+// Create display instance
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Create handlers
+DisplayHandler displayHandler(&display);
+LedHandler ledHandler(ONBOARDLED, posLed, negLed, infoLed);
+ApiHandler apiHandler(&displayHandler);
+ButtonHandler buttonHandler;
+WebSocketHandler webSocketHandler;
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-// Create a WebSocket object
-AsyncWebSocket ws("/ws");
-
-
-void Display::initializeDisplay() {
-  Display::startScreen();
-  // Display Text
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(1, 0);
-  display.print("Initializing");
-  display.setCursor(1, 10);
-  display.print("Version: 1.69 " + codeVersion);
-  display.display();
+// Button callbacks
+void onShortPress() {
+    // Calculate next crypto index but don't change current yet
+    int nextCryptoIndex = (currentCryptoIndex + 1) % NUM_CRYPTOCURRENCIES;
+    String nextCrypto = CRYPTOCURRENCIES[nextCryptoIndex];
+    
+    // Show preview
+    displayHandler.showCoinSplash(nextCrypto);
+    
+    // Set preview mode
+    isPreviewMode = true;
+    previewStartTime = millis();
+    
+    // Visual feedback
+    ledHandler.flashInfo(1);
 }
 
-// Initialize LittleFS
-void initLittleFS() {
-  Serial.println("Initializing Webserver");
-
-  display.clearDisplay();  // Clear the display buffer
-
-  // Display Text
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(10, 15);
-  display.print("Starting Webserver");
-  display.display();
-
-  if (!LittleFS.begin()) {
-
-    Serial.println("An error has occurred while mounting LittleFS");
-
-    display.setCursor(1, 10);
-    display.print("Failed to start Webserver");
-    display.display();
-  }
-
-  Serial.println("LittleFS mounted successfully");
-
-  display.setCursor(20, 25);
-  display.print("Success!");
-  display.display();
-}
-
-// Initialize WiFi
-void initWiFi() {
-
-  Serial.print("Initializing WiFi\n");
-
-  display.clearDisplay();  // Clear the display buffer
-
-  // Display Text
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(10, 0);
-  display.println("Connecting to WiFi");
-  display.display();
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi ..");
-
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-
-    display.setCursor(0, 20);
-    display.print("...");
-    display.display();
-
-    delay(1000);
-  }
-
-  Serial.println(WiFi.localIP());
-
-  display.clearDisplay();  // Clear the display buffer
-  display.setCursor(11, 0);
-  display.println("Connected to WiFi");
-  display.setCursor(30, 13);
-  display.print("IP Address");
-  display.setCursor(23, 23);
-  display.print(WiFi.localIP());
-  display.display();
-
-  delay(2000);
-
-  // Draw the boot doge
-  // drawBitmap(x position, y position, bitmap data, bitmap width, bitmap height, color)
-  clearDisplay();
-  display.setCursor(1, 0);
-  display.drawBitmap(0, 0, much_amaze, 128, 32, WHITE);
-  updateDisplay();
-
-  delay(2000);
-  clearDisplay();
-}
-
-
-String getCurrentStates() {
-
-  JSONVar jsonData;
-
-  for (int i = 0; i <= NUM_STATES; i++) {
-    jsonData["states"][i]["sender"] = "esp8266";
-    jsonData["states"][i]["currentCurrency"] = currentCurrency;
-    jsonData["states"][i]["currentCrypto"] = currentCrypto;
-  }
-
-  String jsonString = JSON.stringify(jsonData);
-
-  Serial.println("\ngetCurrentStates() JSON:\n" + jsonString);
-
-  return jsonString;
-}
-
-void notifyClients(String state) {
-  ws.textAll(state);
-}
-
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
-  AwsFrameInfo *info = (AwsFrameInfo*)arg;
-  if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-    //data[len] = 0;
-
-    Serial.print("Received Websocket Message: ");
-    Serial.print((char*)data); Serial.print("\n");
-
-    if (strcmp((char*)data, "getCurrentStates") == 0) {
-      ws.textAll(getCurrentStates()); //  Send data back to all clients
-    } else {
-
-      StaticJsonDocument<128> doc;
-
-      DeserializationError error = deserializeJson(doc, (char*)data);
-
-      if (error) {
-        Serial.print(F("deserializeJson() failed: "));
-        Serial.println(error.f_str());
+void onLongPress() {
+    // Only allow currency changes for BTC
+    if (currentCrypto != "BTC") {
+        // Visual feedback for denied action
+        ledHandler.flashInfo(3); // Flash 3 times to indicate invalid action
         return;
       }
 
-      JsonObject states_0 = doc[0];
-      auto states_sender = states_0["sender"].as<const char*>(); // "esp8266"
-      String states_currentCurrency = states_0["currentCurrency"]; // "USD"
-      String states_currentCrypto = states_0["currentCrypto"]; // "DOGE"
-
-      sender = states_sender;
-
-      //Serial.println(sender);
-      //Serial.println(currentCrypto);
-      //Serial.println(currentCurrency);
-
-      if (strcmp((char*)sender, "client") == 0) {
-
-        Serial.println("Received message from client.");
-
-        currentCrypto = states_currentCrypto;
-        currentCurrency = states_currentCurrency;
-
+    // Cycle to next fiat currency
+    currentFiatIndex = (currentFiatIndex + 1) % NUM_FIAT_CURRENCIES;
+    currentCurrency = FIAT_CURRENCIES[currentFiatIndex];
+    
+    // Force immediate API update
         previousFetch = 0;
 
-        ws.textAll(getCurrentStates()); //  Send data back to all clients
-
-
-      } else if (strcmp((char*)sender, "esp8266") == 0) {
-
-        Serial.println("Sending message to client.");
-        ws.textAll(getCurrentStates()); //  Send data back to all clients
-
-      }
-    }
-  }
+    // Notify web clients
+    String states = webSocketHandler.getCurrentStates();
+    webSocketHandler.notifyClients(states);
+    
+    // Visual feedback
+    ledHandler.flashPos(1);
 }
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
-             void *arg, uint8_t *data, size_t len) {
-  switch (type) {
-    case WS_EVT_CONNECT:
-      Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-      break;
-    case WS_EVT_DISCONNECT:
-      Serial.printf("WebSocket client #%u disconnected\n", client->id());
-      break;
-    case WS_EVT_DATA:
-      handleWebSocketMessage(arg, data, len);
-      break;
-    case WS_EVT_PONG:
-    case WS_EVT_ERROR:
-      break;
-  }
+// API callback
+void onPriceUpdate(const String& price, float change) {
+    displayHandler.updatePrice(currentCrypto, currentCurrency, price, change);
+    ledHandler.updateLed(change);
 }
-
-void initWebSocket() {
-  ws.onEvent(onEvent);
-  server.addHandler(&ws);
-}
-
-// Function to convert String to char*
-//https://stackoverflow.com/questions/51531033/string-to-char-in-arduino
-char* string2char(String ipString) { // make it to return pointer not a single char
-  char* opChar = new char[ipString.length() + 1]; // local array should not be returned as it will be destroyed outside of the scope of this function. So create it with new operator.
-  memset(opChar, 0, ipString.length() + 1);
-
-  for (int i = 0; i < ipString.length(); i++)
-    opChar[i] = ipString.charAt(i);
-  return opChar; //Add this return statement.
-}
-
-
-
-//VOOIIIIID SETTTUPPPPPPP STAAARTS HEEEEEREEEE
-
-
 
 void setup() {
-  // Serial port for debugging purposes
-  Serial.begin(115200);
+    Serial.begin(115200);
+    delay(100); // Give serial a moment to start
+    
+    Serial.println("Starting setup...");
+    
+    // Initialize I2C
+    Wire.begin();
+    Wire.setClock(400000); // Set I2C clock to 400kHz
+    
+    Serial.println("I2C initialized");
+    
+    // Initialize display
+    if(!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR)) {
+        Serial.println("SSD1306 allocation failed");
+        for(;;); // Don't proceed, loop forever
+    }
+    
+    Serial.println("Display initialized");
+    
+    // Show startup screen
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0,0);
+    display.println("NexGen Crypto Ticker");
+    display.display();
+    delay(2000);
+    
+    // Initialize components
+    displayHandler.begin();
+    ledHandler.begin();
+    
+    // Initialize button and set callbacks
+    buttonHandler.begin();
+    buttonHandler.setCallbacks(onShortPress, onLongPress);
+    
+    // Set API callback
+    apiHandler.setUpdateCallback(onPriceUpdate);
+    
+    // Initialize filesystem
+    if (!LittleFS.begin()) {
+        Serial.println("An error has occurred while mounting LittleFS");
+        return;
+    }
+    
+    // Initialize WiFi and OTA
+    WiFiHandler wifiHandler(ssid, password, &displayHandler, &ledHandler);
+    if (!wifiHandler.begin()) {
+        ESP.restart();
+        return;
+    }
+    wifiHandler.setupOTA();
+    
+    // Initialize WebSocket
+    webSocketHandler.begin(&server, currentCrypto, currentCurrency, previousFetch);
 
-  initializeDisplay(); // Initialize the display
-  setupLeds();
+    // Route for root / web page
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(LittleFS, "/index.html", "text/html", false);
+    });
 
-  initLittleFS();
-  initWiFi();
-  initWebSocket();
-
-  // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
-    request->send(LittleFS, "/index.html", "text/html", false);
-  });
-  server.serveStatic("/", LittleFS, "/");
-  // Start ElegantOTA
-  ElegantOTA.begin(&server);
-  // Start server
-  server.begin();
+    server.serveStatic("/", LittleFS, "/");
+    server.begin();
+    
+    Serial.println("Setup complete");
 }
+
 void loop() {
-  unsigned long currentFetch = millis();
-
-  if (currentFetch - previousFetch >= fetchInterval) {
-
-    previousFetch = currentFetch; // Store the time
-
-    fetchApi(currentCrypto, currentCurrency);
-  }
-  ws.cleanupClients();
-}
-
-// Fetch data from the API
-void fetchApi(String coin, String target) {
-  Serial.println("Fetching '" + coin + target + "' data from API.");
-
-  WiFiClientSecure client;              // Connect to our API URL
-  client.setFingerprint(fingerprint);   // Set the Fingerprint for SSL
-
-  // If we can't connect...
-  if (!client.connect(API_HOST, httpsPort)) {
-    Serial.println("Can't connect to: ");
-    Serial.print(API_HOST);
-
-    String apiError = "Can't connect to API!";
-    // Show error on display
-    displayError("API Error", apiError);
-    return;
-  }
-
-  // Otherwise, set headers
-  String request = ("GET " +  API_URL + " HTTP/1.1\r\n" +
-                    "Host: " + API_HOST + "\r\n" +
-                    "User-Agent: ESP8266\r\n" +
-                    "Accept: */*\r\n" +
-                    "Connection: close\r\n\r\n");
-
-  client.print(request);
-
-  // While we are connected, read the data
-  while (client.connected()) {
-
-    String line = client.readStringUntil('\n');
-    if (line == "\n" || line == "\r\n") {
-      Serial.println("==========\nHeaders Received\n==========\n");
-      break;
+    unsigned long currentTime = millis();
+    
+    // Check if preview mode should end
+    if (isPreviewMode && (currentTime - previewStartTime >= PREVIEW_DURATION)) {
+        isPreviewMode = false;
+        currentCryptoIndex = (currentCryptoIndex + 1) % NUM_CRYPTOCURRENCIES;
+        currentCrypto = CRYPTOCURRENCIES[currentCryptoIndex];
+        previousFetch = 0;  // Force immediate API update
     }
-  }
-
-  // Load our JSON into data variable
-  String data = client.readStringUntil('\r'); // !CHECKTHIS (maybe look at this being /n)
-
-  // !CHECKTHIS print this string to inspect the body
-
-  // Set JSON Size in Buffer
-  StaticJsonDocument<128> filter;
-
-  // Setup JSON Filter
-  JsonObject filter_0 = filter.createNestedObject();
-  filter_0["pair"] = true;
-  filter_0["price"] = true;
-  filter_0["percentChange24h"] = true;
-
-  // Build JSON Doc
-  StaticJsonDocument<256> doc;
-
-  // Handle any deserialization errors
-  DeserializationError error = deserializeJson(doc, data, DeserializationOption::Filter(filter_0)); // !CHECKTHIS remove this filter perhaps *entire deserialization option*
-
-  if (error) {
-    Serial.print(F("deserializeJson() failed: "));
-    Serial.println(error.f_str());
-    return;
-  }
-
-  // Set our received data variables
-  JsonObject root_0 = doc[0]; // !CHECKTHIS
-  const char* data_pair = root_0["pair"]; // "DOGEUSD"
-  const char* data_price = root_0["price"]; // "0"
-  auto data_change = root_0["percentChange24h"].as<float>(); // "0.0000"
-
-  // Convert data_change to percent
-  float changePercent = (data_change * 100);
-
-  if (data != "" /*&& data_change != 0*/ ) {
-
-    // Serial Monitor
-    Serial.println("\n== == == == == == ==");
-    Serial.print("Pair: ");
-    Serial.println(data_pair);
-    Serial.print("Price: ");
-    Serial.println(data_price);
-    Serial.print("1-Hour Change: ");
-    Serial.println(String(changePercent) + "%");
-
-    // Update the display
-    updatePrice(coin, target, data_price, changePercent);
-
-  } else {
-
-    // Serial Monitor
-    Serial.println(" ========== ");
-    Serial.print("API Error: ");
-
-    String apiError ("JSON Invalid");
-
-    // Show error on display
-    displayError("API ERROR", apiError);
-  }
-}
-
-// Update the price and price change on the display
-void updatePrice(String base, String target, String price, float change) {
-
-  // Clear Display Buffer
-  clearDisplay();
-
-  // Set ticker
-  display.setFont();
-  display.setTextColor(BLACK, WHITE); // Inverted Display White BG, BLK Text
-  display.setCursor(1, 0);
-  display.print(base);
-  display.print(" => ");
-  display.print(target);
-
-  // Set the current price
-  display.setCursor(1, 16);
-  display.setTextColor(WHITE); // Revert to dark BG, White text
-  display.setFont(&FreeSansBold9pt7b);
-  display.print("$ ");
-  display.print(price.substring(0, 11));
-  display.setFont();
-
-  // Set the 1-hour change
-  display.setCursor(1, 25);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.print("Change: " + String(change));
-  display.println(" %");
-
-  // Update LED's
-  updateLed(change);
-
-  // Update the display
-  updateDisplay();
-}
-
-// Display the error passed on the display
-void displayError(String type, String e) {
-
-  // Flash Red LED to Alert of Error
-  flashNeg(5);
-
-  // Clear Display Buffer
-  clearDisplay();
-
-  // Set Title
-  display.setTextColor(BLACK, WHITE); // Inverted Display White BG, BLK Text
-  display.setCursor(1, 0);
-  display.print(type);
-
-  // Show Error
-  display.setCursor(1, 11);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.print(e);
-
-  display.setCursor(1, 21);
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.print("Retrying in 15 sec");
-
-  // Update the display
-  updateDisplay();
-
-  // Display error for 15 seconds.
-  delay(15000);
-}
-
-// Setup LED's
-void setupLeds() {
-
-  pinMode (ONBOARDLED, OUTPUT); // Onboard LED
-  onboardLedStatus = false; // Set initial status
-
-  pinMode(posLed, OUTPUT);  // Green LED
-  posLedStatus = false; // Set intial status
-
-  pinMode(negLed, OUTPUT); // Red LED
-  negLedStatus = false; // Set initial status
-
-  pinMode(infoLed, OUTPUT); // Blue LED
-  infoLedStatus = false;  // Set initial status
-}
-
-// Onboard LED on
-void onboardLed() {
-  switch (onboardLedStatus) {
-    case true: // if the led status is true (on)
-      digitalWrite (ONBOARDLED, HIGH); // Switch off LED
-      break;
-
-    default: // otherwise...
-      digitalWrite (ONBOARDLED, LOW); // Switch on LED
-      break;
-  }
-}
-
-// Red LED on
-void negOn() {
-  allOff();
-  negLedStatus = true;
-  digitalWrite(negLed, HIGH);
-}
-
-// Red LED off
-void negOff() {
-  negLedStatus = false;
-  digitalWrite(negLed, LOW);
-}
-
-// Green LED on
-void posOn() {
-  allOff();
-  posLedStatus = true;
-  digitalWrite(posLed, HIGH);
-}
-
-// Green LED off
-void posOff() {
-  posLedStatus = false;
-  digitalWrite(posLed, HIGH);
-}
-
-// Blue LED on
-void infoOn() {
-  allOff();
-  infoLedStatus = true;
-  digitalWrite(infoLed, HIGH);
-}
-
-// Blue LED off
-void infoOff() {
-  infoLedStatus = false;
-  digitalWrite(infoLed, LOW);
-}
-
-// Flash Red LED
-void flashNeg(int num) {
-  for (int count = 0; count < num; count++)
-  {
-    negOn();
-    delay(250);
-    negOff();
-    delay(250);
-  }
-}
-
-// Flash Green LED
-void flashPos(int num) {
-
-  for (int count = 0; count < num; count++)
-  {
-    posOn();
-    delay(250);
-    posOff();
-    delay(250);
-  }
-}
-
-// Flash Blue LED
-void flashInfo(int num) {
-
-  for (int count = 0; count < num; count++)
-  {
-    infoOn();
-    delay(250);
-    infoOff();
-    delay(250);
-  }
-}
-
-// Cycle LED through RGB
-/* Added check if startup for progress bar updates */
-void flashRgb(int num, bool splash) {
-
-  if (splash) {
-
-    // 25%
-    //drawProgressbar(0, 20, 120, 10, 25);
-    //display.display();
-    posOn();
-    delay(250);
-
-    // 50%
-    //drawProgressbar(0, 20, 120, 10, 50);
-    //display.display();
-    negOn();
-    delay(250);
-
-    // 75%
-    //drawProgressbar(0, 20, 120, 10, 75);
-    //display.display();
-    infoOn();
-    delay(250);
-
-  } else {
-    for (int count = 0; count < num; count++)
-    {
-      negOn(); // red
-      delay(250);
-      posOn(); // green
-      delay(250);
-      infoOn(); // blue
-      delay(250);
+    
+    // Only fetch API if not in preview mode
+    if (!isPreviewMode && (currentTime - previousFetch >= fetchInterval)) {
+        previousFetch = currentTime;
+        apiHandler.fetchPrice(currentCrypto, currentCurrency);
     }
-  }
-}
-
-// Turn all LED's off regardless of state
-void allOff() {
-  digitalWrite(posLed, LOW);
-  posLedStatus = false;
-  digitalWrite(negLed, LOW);
-  negLedStatus = false;
-  digitalWrite(infoLed, LOW);
-  infoLedStatus = false;
-}
-
-// Update LED based on $/% Value
-void updateLed(float changeVal) {
-  // If change variable begins with a '-' change is negative
-  // So, turn on red led
-  if (changeVal < 0) {
-    // change is negative
-    negOn();
-
-    // Otherwise, it's a positive value, turn on green led
-  } else {
-    posOn();
-  }
-}
-
-// Update the Display
-void updateDisplay() {
-  display.display();
-}
-
-// Clear the display
-void clearDisplay() {
-  display.clearDisplay();
+    
+    ArduinoOTA.handle();
+    webSocketHandler.cleanupClients();
+    buttonHandler.handle();
 }
