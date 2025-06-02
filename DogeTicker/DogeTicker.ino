@@ -22,22 +22,22 @@
   IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
   THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-  
 */
 
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClientSecure.h>
 
-// Display
-#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+// Include Display Definitions/Variables
+
+#include <display.h>
 
 // Fonts
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
+
+// Images
+#include <images.h>
 
 // JSON Includes
 #include <Arduino_JSON.h>
@@ -47,38 +47,12 @@
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "LittleFS.h"
-#include <ArduinoOTA.h>
+#include <ElegantOTA.h>
 
-// Local Includes
-#include "bitmaps.h"
-#include "currency_symbols.h"
+// Include Definitions & Variables for WiFi & API // SSL
+#include <definitions.h>
 
-// ===================================== //
-// ===== Definitions and Variables ===== //
-// ===================================== //
-// Code Version Info
-String codeVersion = "1.0.0";
-
-// Network Credentials
-#define ssid "YOUR_SSID"  // Your WiFi Network Name (Case Sensitive)
-#define password "YOUR_PWD"  // Your WiFi Network Password (Case Sensitive)
-
-// API Variables
-String currentCrypto = "DOGE"; // Stores default/currently selected cryptocoin
-String currentCurrency = "USD"; // Stores default/currently selected currency
-
-const long fetchInterval = 30000; // Time between API Fetch :: 30 seconds
-
-// API Definitions
-#define API_HOST ("api.gemini.com") // API Endpoint Host
-
-// Port used to connect to API Endpoint Host.
-// Since we're using SSL, we'll use port 443.
-const int httpsPort = 443;
-
-// OLED
-#define OLED_RESET -1
-Adafruit_SSD1306 display(128, 32, &Wire, OLED_RESET);
+// Include Setup for LED's
 
 // LED Definitions
 #define ONBOARDLED 2 // Built in LED on ESP-12/ESP-07
@@ -110,26 +84,15 @@ AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 
-
-void initializeDisplay() {
-  Serial.println("Initializing Display ...");
-
-  // initialize with the I2C addr 0x3C for 128x32 OLED
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-
-  display.clearDisplay();  // Clear the display buffer
-  
-  // Show appropriate coin splash screen
-  showCoinSplash(display, currentCrypto);
-
-  // Display initialization text
-  display.clearDisplay();
+void Display::initializeDisplay() {
+  Display::startScreen();
+  // Display Text
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(1, 0);
   display.print("Initializing");
   display.setCursor(1, 10);
-  display.print("Version: " + codeVersion);
+  display.print("Version: 1.69 " + codeVersion);
   display.display();
 }
 
@@ -201,15 +164,25 @@ void initWiFi() {
   display.print(WiFi.localIP());
   display.display();
 
-  delay(5000);
+  delay(2000);
 
+  // Draw the boot doge
+  // drawBitmap(x position, y position, bitmap data, bitmap width, bitmap height, color)
+  clearDisplay();
+  display.setCursor(1, 0);
+  display.drawBitmap(0, 0, much_amaze, 128, 32, WHITE);
+  updateDisplay();
+
+  delay(2000);
+  clearDisplay();
 }
+
 
 String getCurrentStates() {
 
   JSONVar jsonData;
 
-  for (int i = 0; i < NUM_STATES; i++) {
+  for (int i = 0; i <= NUM_STATES; i++) {
     jsonData["states"][i]["sender"] = "esp8266";
     jsonData["states"][i]["currentCurrency"] = currentCurrency;
     jsonData["states"][i]["currentCrypto"] = currentCrypto;
@@ -217,10 +190,9 @@ String getCurrentStates() {
 
   String jsonString = JSON.stringify(jsonData);
 
-  //Serial.println("\ngetCurrentStates() JSON:\n" + jsonString);
+  Serial.println("\ngetCurrentStates() JSON:\n" + jsonString);
 
   return jsonString;
-
 }
 
 void notifyClients(String state) {
@@ -239,7 +211,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       ws.textAll(getCurrentStates()); //  Send data back to all clients
     } else {
 
-      StaticJsonDocument<192> doc;
+      StaticJsonDocument<128> doc;
 
       DeserializationError error = deserializeJson(doc, (char*)data);
 
@@ -249,7 +221,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         return;
       }
 
-      JsonObject states_0 = doc["states"][0];
+      JsonObject states_0 = doc[0];
       auto states_sender = states_0["sender"].as<const char*>(); // "esp8266"
       String states_currentCurrency = states_0["currentCurrency"]; // "USD"
       String states_currentCrypto = states_0["currentCrypto"]; // "DOGE"
@@ -280,7 +252,6 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
       }
     }
   }
-
 }
 
 void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
@@ -317,47 +288,11 @@ char* string2char(String ipString) { // make it to return pointer not a single c
   return opChar; //Add this return statement.
 }
 
-void initOTA() {
-  // Port defaults to 8266
-  // ArduinoOTA.setPort(8266);
 
-  // Hostname defaults to esp8266-[ChipID]
-  ArduinoOTA.setHostname("DogeTickler");
 
-  // No authentication by default
-  // ArduinoOTA.setPassword("admin");
+//VOOIIIIID SETTTUPPPPPPP STAAARTS HEEEEEREEEE
 
-  ArduinoOTA.onStart([]() {
-    String type;
-    if (ArduinoOTA.getCommand() == U_FLASH) {
-      type = "sketch";
-    } else { // U_FS
-      type = "filesystem";
-    }
-    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-    Serial.println("Start updating " + type);
-  });
-  
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
 
-  ArduinoOTA.begin();
-  Serial.println("OTA Ready");
-}
 
 void setup() {
   // Serial port for debugging purposes
@@ -369,150 +304,131 @@ void setup() {
   initLittleFS();
   initWiFi();
   initWebSocket();
-  initOTA();  // Initialize OTA
 
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(LittleFS, "/index.html", "text/html", false);
   });
-
   server.serveStatic("/", LittleFS, "/");
-
+  // Start ElegantOTA
+  ElegantOTA.begin(&server);
   // Start server
   server.begin();
 }
-
 void loop() {
   unsigned long currentFetch = millis();
 
   if (currentFetch - previousFetch >= fetchInterval) {
+
     previousFetch = currentFetch; // Store the time
+
     fetchApi(currentCrypto, currentCurrency);
   }
-
-  ArduinoOTA.handle();  // Handle OTA updates
   ws.cleanupClients();
 }
 
 // Fetch data from the API
 void fetchApi(String coin, String target) {
-  // Show appropriate coin splash while waiting for first successful API response
-  static bool firstFetch = true;
-  if (firstFetch) {
-    showCoinSplash(display, coin);
-    firstFetch = false;
-  }
-  
-  Serial.println("Fetching '" + coin + "/" + target + "' data from API.");
+  Serial.println("Fetching '" + coin + target + "' data from API.");
 
-  WiFiClientSecure client;
-  client.setInsecure();  // Don't verify SSL certificate
-
-  Serial.print("Connecting to ");
-  Serial.println(API_HOST);
+  WiFiClientSecure client;              // Connect to our API URL
+  client.setFingerprint(fingerprint);   // Set the Fingerprint for SSL
 
   // If we can't connect...
   if (!client.connect(API_HOST, httpsPort)) {
-    Serial.println("Connection failed!");
-    String apiError = "Connection failed!";
+    Serial.println("Can't connect to: ");
+    Serial.print(API_HOST);
+
+    String apiError = "Can't connect to API!";
+    // Show error on display
     displayError("API Error", apiError);
     return;
   }
 
-  Serial.println("Connected to API endpoint");
+  // Otherwise, set headers
+  String request = ("GET " +  API_URL + " HTTP/1.1\r\n" +
+                    "Host: " + API_HOST + "\r\n" +
+                    "User-Agent: ESP8266\r\n" +
+                    "Accept: */*\r\n" +
+                    "Connection: close\r\n\r\n");
 
-  // Construct the URL properly
-  String apiUrl = "/v1/pricefeed/" + coin + target;
-
-  // Set headers
-  String request = String("GET ") + apiUrl + " HTTP/1.1\r\n" +
-                  "Host: " + API_HOST + "\r\n" +
-                  "User-Agent: ESP8266\r\n" +
-                  "Connection: close\r\n\r\n";
-
-  Serial.println("Sending request...");
   client.print(request);
 
-  Serial.println("Reading response...");
-  
-  // Wait for data to be available
-  unsigned long timeout = millis();
-  while (client.available() == 0) {
-    if (millis() - timeout > 5000) {
-      Serial.println(">>> Client Timeout !");
-      client.stop();
-      displayError("API Error", "Timeout");
-      return;
-    }
-  }
+  // While we are connected, read the data
+  while (client.connected()) {
 
-  // Skip HTTP headers
-  String line;
-  bool jsonStarted = false;
-  String jsonData = "";
-  
-  while (client.available()) {
-    line = client.readStringUntil('\n');
-    line.trim(); // Remove leading/trailing whitespace
-    
-    // Debug print the line
-    Serial.println("Read line: " + line);
-    
-    // Check if we've found the end of headers
-    if (line.length() == 0) {
-      jsonStarted = true;
-      continue;
-    }
-    
-    // If we're past headers, this should be JSON data
-    if (jsonStarted && line.length() > 0) {
-      jsonData = line;
+    String line = client.readStringUntil('\n');
+    if (line == "\n" || line == "\r\n") {
+      Serial.println("==========\nHeaders Received\n==========\n");
       break;
     }
   }
 
-  Serial.println("Raw API Response: " + jsonData);
+  // Load our JSON into data variable
+  String data = client.readStringUntil('\r'); // !CHECKTHIS (maybe look at this being /n)
+
+  // !CHECKTHIS print this string to inspect the body
 
   // Set JSON Size in Buffer
-  StaticJsonDocument<192> doc;
+  StaticJsonDocument<128> filter;
+
+  // Setup JSON Filter
+  JsonObject filter_0 = filter.createNestedObject();
+  filter_0["pair"] = true;
+  filter_0["price"] = true;
+  filter_0["percentChange24h"] = true;
+
+  // Build JSON Doc
+  StaticJsonDocument<256> doc;
 
   // Handle any deserialization errors
-  DeserializationError error = deserializeJson(doc, jsonData);
+  DeserializationError error = deserializeJson(doc, data, DeserializationOption::Filter(filter_0)); // !CHECKTHIS remove this filter perhaps *entire deserialization option*
 
   if (error) {
     Serial.print(F("deserializeJson() failed: "));
     Serial.println(error.f_str());
-    displayError("JSON Error", error.f_str());
     return;
   }
 
-  // Get the first array element
-  JsonObject root_0 = doc[0];
-  
-  if (!root_0.isNull()) {
-    String price = root_0["price"].as<String>();
-    float change = root_0["percentChange24h"].as<float>();
+  // Set our received data variables
+  JsonObject root_0 = doc[0]; // !CHECKTHIS
+  const char* data_pair = root_0["pair"]; // "DOGEUSD"
+  const char* data_price = root_0["price"]; // "0"
+  auto data_change = root_0["percentChange24h"].as<float>(); // "0.0000"
 
-    // Debug prints
-    Serial.println("Parsed price: " + price);
-    Serial.println("Parsed change: " + String(change, 4));
+  // Convert data_change to percent
+  float changePercent = (data_change * 100);
 
-    if (price != "") {
-      // Update the display
-      updatePrice(coin, target, price, change);
-    } else {
-      displayError("API ERROR", "Invalid price data");
-    }
+  if (data != "" /*&& data_change != 0*/ ) {
+
+    // Serial Monitor
+    Serial.println("\n== == == == == == ==");
+    Serial.print("Pair: ");
+    Serial.println(data_pair);
+    Serial.print("Price: ");
+    Serial.println(data_price);
+    Serial.print("1-Hour Change: ");
+    Serial.println(String(changePercent) + "%");
+
+    // Update the display
+    updatePrice(coin, target, data_price, changePercent);
+
   } else {
-    displayError("API ERROR", "Invalid JSON format");
-  }
 
-  // Close the connection
-  client.stop();
+    // Serial Monitor
+    Serial.println(" ========== ");
+    Serial.print("API Error: ");
+
+    String apiError ("JSON Invalid");
+
+    // Show error on display
+    displayError("API ERROR", apiError);
+  }
 }
 
 // Update the price and price change on the display
 void updatePrice(String base, String target, String price, float change) {
+
   // Clear Display Buffer
   clearDisplay();
 
@@ -528,53 +444,19 @@ void updatePrice(String base, String target, String price, float change) {
   display.setCursor(1, 16);
   display.setTextColor(WHITE); // Revert to dark BG, White text
   display.setFont(&FreeSansBold9pt7b);
-  
-  // Choose currency symbol based on target currency
-  const char* currencySymbol;
-  if (target == "USD") {
-    currencySymbol = SYMBOL_USD;
-  } else if (target == "EUR") {
-    currencySymbol = SYMBOL_EUR;
-  } else if (target == "AUD") {
-    currencySymbol = SYMBOL_AUD;
-  } else if (target == "JPY") {
-    currencySymbol = SYMBOL_JPY;
-  } else if (target == "GBP") {
-    currencySymbol = SYMBOL_GBP;
-  } else if (target == "RUB") {
-    currencySymbol = SYMBOL_RUB;
-  } else if (target == "SGD") {
-    currencySymbol = SYMBOL_SGD;
-  } else if (target == "CAD") {
-    currencySymbol = SYMBOL_CAD;
-  } else {
-    currencySymbol = SYMBOL_USD; // Default to USD if unknown
-  }
-  
-  display.print(currencySymbol);
-  display.print(" ");
-  
-  // For JPY, show without decimal places as it's a whole number currency
-  if (target == "JPY") {
-    // Convert price to integer and remove decimal places
-    display.print(String((int)price.toFloat()));
-  } else {
-    display.print(price.substring(0, 11));
-  }
+  display.print("$ ");
+  display.print(price.substring(0, 11));
   display.setFont();
 
-  // Set the 24-hour change
+  // Set the 1-hour change
   display.setCursor(1, 25);
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  // Convert change to percentage
-  float changePercent = change * 100.0;
-  display.print("Change: ");
-  display.print(changePercent, 2); // Display with 2 decimal places
+  display.print("Change: " + String(change));
   display.println(" %");
 
   // Update LED's
-  updateLed(changePercent);
+  updateLed(change);
 
   // Update the display
   updateDisplay();
@@ -610,7 +492,6 @@ void displayError(String type, String e) {
 
   // Display error for 15 seconds.
   delay(15000);
-
 }
 
 // Setup LED's

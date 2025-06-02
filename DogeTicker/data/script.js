@@ -26,12 +26,21 @@ function onLoad(event) {
 
 function setUpApp() {
 
+/*
     // Set our select list elements to disabled
     $('#target-select').attr('disabled', 'disabled');
     $('#crypto-select').attr('disabled', 'disabled');
 
     // Set Save Button to Disabled
     $('#saveChangesButton').attr('disabled', 'disabled');
+*/
+
+    // Set our select list elements to enabled
+    $('#target-select').attr('enabled', 'enabled');
+    $('#crypto-select').attr('enabled', 'enabled');
+
+    // Set Save Button to Enabled
+    $('#saveChangesButton').attr('enabled', 'enabled');
 
     parseSymbols(); // Fetch our data from API and parse JSON response
 
@@ -64,14 +73,14 @@ function onOpen(event) {
 
     $('#saveChangesButton').removeClass("btn-warning btn-danger").addClass("btn-success");
     $('#saveChangesButton').html("Save Changes");
-    //  $('#saveChangesButton').removeAttr('disabled');
+    //  $('#saveChangesButton').removeAttr('true');
 }
 
 function onClose(event) {
     connected = false;
     console.log('WebSocket Closed');
     setTimeout(initWebSocket, 2000);
-    $('#saveChangesButton').attr('disabled', 'disabled');
+    $('#saveChangesButton').attr('true', 'true');
     $('#saveChangesButton').removeClass("btn-primary btn-warning").addClass("btn-danger");
     $('#saveChangesButton').html("Can't Connect to Device")
 }
@@ -174,7 +183,7 @@ async function parseSymbols(curCrypto, curTarget) {
 
     // Set() with filters for target currencies | eg. if "btcusd" => find the usd
     //const targetCurrencies = new Set(["usd", "btc", "eth", "fil", "sgd", "gbp"]);
-    var targetCurrencies = ["usd", "btc", "eth", "fil", "sgd", "gbp", "eur", "dai", "bch", "ltc"]
+    var targetCurrencies = ["usd", "btc", "doge", "eth", "fil", "sgd", "gbp", "eur", "dai", "bch", "ltc"]
 
     // Sets our Symbols variable once we receive the data from the API
     let symbols = await getSupportedSymbols();
