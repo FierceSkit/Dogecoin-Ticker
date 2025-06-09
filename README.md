@@ -44,7 +44,7 @@ Connect the OLED display to the NodeMCU as follows:
 |SCL|D1|
 |SDA|D2|
 
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/WiringSchematic.png?raw=true" />
+<img src="https://github.com/FierceSkit/DogeTicker/blob/development/images/WiringSchematic.png?raw=true" />
 
 ## Software Setup
 
