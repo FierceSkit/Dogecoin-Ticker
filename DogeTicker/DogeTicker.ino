@@ -58,16 +58,16 @@
 
 // Available cryptocurrencies
 const int NUM_CRYPTOCURRENCIES = 3;
-const String CRYPTOCURRENCIES[NUM_CRYPTOCURRENCIES] = {"BTC", "DOGE", "LTC"};
+const String CRYPTOCURRENCIES[NUM_CRYPTOCURRENCIES] = {"DOGE", "BTC", "LTC", "XMR"};
 int currentCryptoIndex = 0;
 
 // Available fiat currencies
 const int NUM_FIAT_CURRENCIES = 5;
-const String FIAT_CURRENCIES[NUM_FIAT_CURRENCIES] = {"USD", "EUR", "GBP", "RUB", "SGD"};
+const String FIAT_CURRENCIES[NUM_FIAT_CURRENCIES] = {"USD", "EUR", "GBP", "RUB"};
 int currentFiatIndex = 0;
 
 // Global variables
-String currentCrypto = "BTC";
+String currentCrypto = "DOGE";
 String currentCurrency = "USD";
 unsigned long previousFetch = 0;
 const long fetchInterval = 30000;
