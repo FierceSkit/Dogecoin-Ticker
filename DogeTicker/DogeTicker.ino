@@ -57,12 +57,12 @@
 #define OLED_ADDR 0x3C
 
 // Available cryptocurrencies
-const int NUM_CRYPTOCURRENCIES = 3;
+const int NUM_CRYPTOCURRENCIES = 4;
 const String CRYPTOCURRENCIES[NUM_CRYPTOCURRENCIES] = {"DOGE", "BTC", "LTC", "XMR"};
 int currentCryptoIndex = 0;
 
 // Available fiat currencies
-const int NUM_FIAT_CURRENCIES = 5;
+const int NUM_FIAT_CURRENCIES = 4;
 const String FIAT_CURRENCIES[NUM_FIAT_CURRENCIES] = {"USD", "EUR", "GBP", "RUB"};
 int currentFiatIndex = 0;
 
