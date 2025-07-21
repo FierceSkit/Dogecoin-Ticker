@@ -5,14 +5,11 @@ A sleek and modern cryptocurrency price ticker built for the ESP8266 (NodeMCU) w
 This project is a fork of the [NexGen-Crypto-Ticker](https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker) with significant enhancements and improvements.
 
 <img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/ToTheMoon-With-ShibeLid.jpg?raw=true" width="510"/>
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/ScreenRecording.gif?raw=true" />
 
 ## New Features & Improvements
 
 - **Enhanced Currency Support**: Added support for multiple currencies with proper symbol display:
-  - USD ($), EUR (€), GBP (£), JPY (¥)
-  - AUD (A$), CAD (C$), SGD (S$), RUB (₽)
-  - Special handling for JPY (no decimal places)
+  - USD ($), EUR (€), GBP (£), RUB (₽)
 - **Improved Bitmap Display**:
   - Custom high-quality logos for DOGE, BTC, and LTC
   - Splash screens during initialization
