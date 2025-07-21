@@ -4,7 +4,7 @@ A sleek and modern cryptocurrency price ticker built for the ESP8266 (NodeMCU) w
 
 This project is a fork of the [NexGen-Crypto-Ticker](https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker) with significant enhancements and improvements.
 
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/ToTheMoon-With-ShibeLid.jpg?raw=true" width="510"/>
+<img src="https://github.com/FierceSkit/DogeTicker/blob/main/images/ToTheMoon-With-ShibeLid.jpg?raw=true" width="510"/>
 
 ## New Features & Improvements
 
@@ -41,7 +41,7 @@ Connect the OLED display to the NodeMCU as follows:
 |SCL|D1|
 |SDA|D2|
 
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/WiringSchematic.png?raw=true" />
+<img src="https://github.com/FierceSkit/DogeTicker/blob/main/images/WiringSchematic.png?raw=true" />
 
 ## Software Setup
 
@@ -78,9 +78,9 @@ Connect the OLED display to the NodeMCU as follows:
 
 ## Example Displays
 
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/BTCUSD.jpg?raw=true" />
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/DOGEUSD.jpg?raw=true" />
-<img src="https://github.com/NexGen-Digital-Solutions/NexGen-Crypto-Ticker/blob/main/images/LTCUSD.jpg?raw=true" />
+<img src="https://github.com/FierceSkit/DogeTicker/blob/main/images/BTCUSD.jpg?raw=true" />
+<img src="https://github.com/FierceSkit/DogeTicker/blob/main/images/DOGEUSD.jpg?raw=true" />
+<img src="https://github.com/FierceSkit/DogeTicker/blob/main/images/LTCUSD.jpg?raw=true" />
 
 ## Contributing
 
