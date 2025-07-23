@@ -5,6 +5,9 @@
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 
+extern bool isSplashActive;
+extern bool isBootSplash;
+
 #define API_HOST "api.gemini.com"
 #define API_PORT 443
 
@@ -21,8 +24,10 @@ public:
     }
 
     bool fetchPrice(const String& crypto, const String& fiat) {
-        // Show loading message before starting the request
-        display->showLoading("Fetching Price", crypto + "/" + fiat);
+        if (isSplashActive) {
+            display->showCoinSplash(crypto);
+            isSplashActive = false;
+        }
         
         WiFiClientSecure client;
         client.setInsecure();  // Don't verify SSL certificate
@@ -32,13 +37,14 @@ public:
 
         if (!client.connect(API_HOST, API_PORT)) {
             Serial.println("Connection failed!");
+            isBootSplash = false;
+            isSplashActive = false;
             display->showError("API Error", "Connection failed!");
             return false;
         }
 
         Serial.println("Connected to API endpoint");
-        // Update loading message for API request
-        display->showLoading("Connected", "Getting data...");
+        // No loading message, keep splash until data is ready
 
         String apiUrl = "/v1/pricefeed/" + crypto + fiat;
         String request = String("GET ") + apiUrl + " HTTP/1.1\r\n" +
@@ -50,8 +56,7 @@ public:
         client.print(request);
 
         Serial.println("Reading response...");
-        // Update loading message for response waiting
-        display->showLoading("Processing", "Please wait...");
+        // No loading message, keep splash until data is ready
         
         // Wait for data
         unsigned long timeout = millis();
@@ -59,6 +64,8 @@ public:
             if (millis() - timeout > 5000) {
                 Serial.println(">>> Client Timeout !");
                 client.stop();
+                isBootSplash = false;
+                isSplashActive = false;
                 display->showError("API Error", "Timeout");
                 return false;
             }
@@ -89,6 +96,8 @@ public:
             Serial.printf("HTTP Error: %d\n", httpCode);
             display->showError("API Error", "Price pair not available");
             client.stop();
+            isBootSplash = false;
+            isSplashActive = false;
             return false;
         }
 
@@ -111,6 +120,8 @@ public:
         if (error) {
             Serial.print(F("deserializeJson() failed: "));
             Serial.println(error.f_str());
+            isBootSplash = false;
+            isSplashActive = false;
             display->showError("JSON Error", error.f_str());
             return false;
         }
@@ -126,11 +137,15 @@ public:
                 if (onPriceUpdate != nullptr) {
                     onPriceUpdate(price, change);
                 }
+                isBootSplash = false;
+                isSplashActive = false;
                 return true;
             }
         }
 
         display->showError("API ERROR", "Price pair not available");
+        isBootSplash = false;
+        isSplashActive = false;
         return false;
     }
 };

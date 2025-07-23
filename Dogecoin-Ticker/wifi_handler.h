@@ -47,7 +47,7 @@ public:
         Serial.println(WiFi.localIP());
         display->showWiFiSuccess(WiFi.localIP());
         led->flashPos(2);  // Success indication
-        delay(2000);  // Show connection info for 2 seconds
+        delay(5000);  // Show connection info for 5 seconds
         
         return true;
     }

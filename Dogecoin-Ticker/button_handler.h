@@ -4,7 +4,7 @@
 #include <Arduino.h>
 
 // Button Definitions
-#define BUTTON_PIN 4  // GPIO4 (D2)
+#define BUTTON_PIN 0  // GPIO0 (D3)
 #define LONG_PRESS_DURATION 1000  // Duration for long press in milliseconds
 
 class ButtonHandler {

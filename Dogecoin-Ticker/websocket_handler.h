@@ -6,6 +6,8 @@
 #include <ArduinoJson.h>
 #include <Arduino_JSON.h>
 
+extern bool isSplashActive;
+
 class WebSocketHandler {
 private:
     AsyncWebSocket ws;
@@ -96,6 +98,7 @@ private:
                     currentCrypto = newCrypto;
                     currentCurrency = newCurrency;
                     *previousFetch = 0;
+                    isSplashActive = true;
                     notifyClients(getCurrentStates());
                 }
             }

@@ -75,6 +75,11 @@ bool isPreviewMode = false;
 unsigned long previewStartTime = 0;
 const unsigned long PREVIEW_DURATION = 2000;
 
+// Splash state for bootup
+bool isBootSplash = true;
+bool splashFetchDone = false;
+bool isSplashActive = true;
+
 // Create display instance
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -103,6 +108,8 @@ void onShortPress() {
     
     // Visual feedback
     ledHandler.flashInfo(1);
+    // Set splash active for new coin
+    isSplashActive = true;
 }
 
 void onLongPress() {
@@ -130,6 +137,10 @@ void onLongPress() {
 
 // API callback
 void onPriceUpdate(const String& price, float change) {
+    if (isBootSplash) {
+        isBootSplash = false; // Hide splash after first price update
+        splashFetchDone = false; // Reset for next splash event
+    }
     displayHandler.updatePrice(currentCrypto, currentCurrency, price, change);
     ledHandler.updateLed(change);
 }
@@ -155,13 +166,8 @@ void setup() {
     Serial.println("Display initialized");
     
     // Show startup screen
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0,0);
-    display.println("NexGen Crypto Ticker");
-    display.display();
-    delay(2000);
+    displayHandler.showCoinSplash(currentCrypto);
+    delay(5000);
     
     // Initialize components
     displayHandler.begin();
@@ -186,6 +192,9 @@ void setup() {
         ESP.restart();
         return;
     }
+    // Show coin splash after WiFi connects and after WiFi message
+    displayHandler.showCoinSplash(currentCrypto);
+    isBootSplash = true;
     wifiHandler.setupOTA();
     
     // Initialize WebSocket
@@ -213,10 +222,15 @@ void loop() {
         previousFetch = 0;  // Force immediate API update
     }
     
-    // Only fetch API if not in preview mode
-    if (!isPreviewMode && (currentTime - previousFetch >= fetchInterval)) {
+    // Only fetch API if not in preview mode and not in boot splash
+    if (!isPreviewMode && !isBootSplash && (currentTime - previousFetch >= fetchInterval)) {
         previousFetch = currentTime;
         apiHandler.fetchPrice(currentCrypto, currentCurrency);
+    }
+    // If in boot splash, fetch price only once
+    if (isBootSplash && !splashFetchDone) {
+        apiHandler.fetchPrice(currentCrypto, currentCurrency);
+        splashFetchDone = true;
     }
     
     ArduinoOTA.handle();

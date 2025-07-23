@@ -37,11 +37,14 @@ public:
         display->setTextColor(SSD1306_WHITE);
         display->setCursor(10, 0);
         display->println("Connecting to WiFi");
-        display->setCursor(0, 20);
-        display->print("Attempt: ");
-        display->print(attempt);
-        display->print("/");
-        display->print(maxAttempts);
+        // Center the attempt message
+        String attemptMsg = "Attempt: " + String(attempt) + "/" + String(maxAttempts);
+        int16_t x1, y1;
+        uint16_t w, h;
+        display->getTextBounds(attemptMsg, 0, 0, &x1, &y1, &w, &h);
+        int16_t x = (128 - w) / 2;
+        display->setCursor(x, 20);
+        display->print(attemptMsg);
         display->display();
     }
 
@@ -68,8 +71,14 @@ public:
         display->println("Connected to WiFi");
         display->setCursor(30, 13);
         display->print("IP Address");
-        display->setCursor(23, 23);
-        display->print(ip);
+        // Center the IP address
+        String ipStr = ip.toString();
+        int16_t x1, y1;
+        uint16_t w, h;
+        display->getTextBounds(ipStr, 0, 0, &x1, &y1, &w, &h);
+        int16_t x = (128 - w) / 2;
+        display->setCursor(x, 23);
+        display->print(ipStr);
         display->display();
     }
 
@@ -86,8 +95,11 @@ public:
             logo = DOGE_LOGO;
         } else if (coin == "LTC") {
             logo = LTC_LOGO;
+        } else if (coin == "XMR") {
+            logo = XMR_LOGO;
+        } else {
+            logo = DOGE_LOGO;
         }
-        
         display->drawBitmap(0, 0, logo, 128, 32, WHITE);
         display->display();
     }
@@ -123,11 +135,11 @@ public:
         display->setFont();
 
         // Set the 24-hour change
-        display->setCursor(1, 25);
+        display->setCursor(1, 24);
         display->setTextSize(1);
         display->setTextColor(WHITE);
         float changePercent = change * 100.0;
-        display->print("Change: ");
+        display->print("24h-Change: ");
         display->print(changePercent, 2);
         display->println(" %");
 
